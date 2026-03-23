@@ -3,45 +3,50 @@
  */
 
 import type { Expense } from '~/types'
-import { format, parseISO, addDays as fnsAddDays, addHours as fnsAddHours } from 'date-fns'
+import { format, addDays as fnsAddDays, addHours as fnsAddHours } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { toFloatingLocalDate, toIsoZFromFloatingDate } from '~/utils/floatingDateTime'
+
+const asFloatingDate = (date: string | Date) => {
+  if (date instanceof Date) return date
+  return toFloatingLocalDate(date) || new Date(date)
+}
 
 export const formatDateTime = (dateStr?: string | Date) => {
   if (!dateStr) return ''
-  return format(new Date(dateStr), "PPP HH:mm", { locale: es })
+  return format(asFloatingDate(dateStr), "PPP HH:mm", { locale: es })
 }
 
 export const formatDate = (dateStr?: string | Date) => {
   if (!dateStr) return ''
-  return format(new Date(dateStr), "PPP", { locale: es })
+  return format(asFloatingDate(dateStr), "PPP", { locale: es })
 }
 
 export const formatTime = (dateStr?: string | Date) => {
   if (!dateStr) return ''
-  return format(new Date(dateStr), "HH:mm")
+  return format(asFloatingDate(dateStr), "HH:mm")
 }
 
 export const formatDateFull = (dateStr?: string | Date) => {
   if (!dateStr) return ''
-  return format(new Date(dateStr), "EEEE, d 'de' MMMM", { locale: es })
+  return format(asFloatingDate(dateStr), "EEEE, d 'de' MMMM", { locale: es })
 }
 
 export const formatDateWithDayShort = (dateStr?: string | Date) => {
   if (!dateStr) return ''
-  return format(new Date(dateStr), "EEE, dd MMM", { locale: es })
+  return format(asFloatingDate(dateStr), "EEE, dd MMM", { locale: es })
 }
 
 export const addDays = (dateStr: string, amount: number) => {
   if (!dateStr) return ''
-  // Si no tiene hora, asumimos inicio del día para evitar problemas de zona horaria al sumar
-  const date = new Date(dateStr)
-  return format(fnsAddDays(date, amount), "yyyy-MM-dd'T'HH:mm")
+  const date = asFloatingDate(dateStr)
+  return toIsoZFromFloatingDate(fnsAddDays(date, amount))
 }
 
 export const addHours = (dateStr: string, amount: number) => {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return format(fnsAddHours(date, amount), "yyyy-MM-dd'T'HH:mm")
+  const date = asFloatingDate(dateStr)
+  return toIsoZFromFloatingDate(fnsAddHours(date, amount))
 }
 
 /**
@@ -50,7 +55,7 @@ export const addHours = (dateStr: string, amount: number) => {
  * @returns Short formatted date
  */
 export function formatDateShort(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date) : date
+  const d = asFloatingDate(date)
   return d.toLocaleDateString('es-ES', {
     day: '2-digit',
     month: '2-digit',
@@ -74,7 +79,8 @@ export function isToday(date: string | Date): boolean {
       return datePart === today
     }
     // Handle ISO format or other string formats
-    const d = new Date(date)
+    const d = toFloatingLocalDate(date)
+    if (!d) return false
     return getDateString(d) === today
   }
   // Handle Date object
@@ -99,7 +105,8 @@ export function isYesterday(date: string | Date): boolean {
       return datePart === yesterdayStr
     }
     // Handle ISO format or other string formats
-    const d = new Date(date)
+    const d = toFloatingLocalDate(date)
+    if (!d) return false
     return getDateString(d) === yesterdayStr
   }
   // Handle Date object
@@ -123,7 +130,7 @@ export function getRelativeDayLabel(date: string | Date): string {
  * @returns Number of days elapsed
  */
 export function getDaysElapsed(startDate: string): number {
-  const start = new Date(startDate)
+  const start = asFloatingDate(startDate)
   const today = new Date()
   const diffTime = today.getTime() - start.getTime()
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -138,16 +145,16 @@ export function getDaysElapsed(startDate: string): number {
  */
 export const getDayDiff = (start?: string, end?: string) => {
   if (!start || !end) return null
-  const d1 = new Date(start); d1.setHours(0,0,0,0)
-  const d2 = new Date(end); d2.setHours(0,0,0,0)
+  const d1 = asFloatingDate(start); d1.setHours(0,0,0,0)
+  const d2 = asFloatingDate(end); d2.setHours(0,0,0,0)
   const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24))
   return diff > 0 ? `+${diff}` : null
 }
 
 export const getDurationDays = (start?: string, end?: string) => {
   if (!start || !end) return 0
-  const d1 = new Date(start); d1.setHours(0, 0, 0, 0)
-  const d2 = new Date(end); d2.setHours(0, 0, 0, 0)
+  const d1 = asFloatingDate(start); d1.setHours(0, 0, 0, 0)
+  const d2 = asFloatingDate(end); d2.setHours(0, 0, 0, 0)
   const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24))
   return Math.max(0, diff) + 1
 }
@@ -165,7 +172,7 @@ export function getDateString(date: string | Date): string {
       return date.split(' ')[0] || date
     }
     // Handle ISO format or other string formats
-    const d = new Date(date)
+    const d = asFloatingDate(date)
     const year = d.getFullYear()
     const month = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
@@ -216,7 +223,7 @@ export function getTimeString(date: string | Date): string {
       return timePart || '00:00'
     }
     // Handle ISO format or other string formats
-    const d = new Date(date)
+    const d = asFloatingDate(date)
     const hours = String(d.getHours()).padStart(2, '0')
     const minutes = String(d.getMinutes()).padStart(2, '0')
     return `${hours}:${minutes}`
@@ -255,15 +262,9 @@ export function getEndOfDay(date: string | Date): string {
  */
 export function sortByTimestamp(expenses: Expense[]): Expense[] {
   return [...expenses].sort((a, b) => {
-    // Convert timestamps to comparable format
-    const timeA = a.timestamp.includes(' ') && !a.timestamp.includes('T')
-      ? a.timestamp.replace(' ', 'T') + ':00' // Convert to ISO-like format for comparison
-      : a.timestamp
-    const timeB = b.timestamp.includes(' ') && !b.timestamp.includes('T')
-      ? b.timestamp.replace(' ', 'T') + ':00'
-      : b.timestamp
-
-    return new Date(timeB).getTime() - new Date(timeA).getTime()
+    const dateA = asFloatingDate(a.timestamp)
+    const dateB = asFloatingDate(b.timestamp)
+    return dateB.getTime() - dateA.getTime()
   })
 }
 
@@ -281,5 +282,5 @@ export function getCurrentTimestamp(): string {
  * @returns Date object
  */
 export function parseISODate(isoString: string): Date {
-  return new Date(isoString)
+  return asFloatingDate(isoString)
 }

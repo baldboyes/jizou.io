@@ -1,5 +1,4 @@
 import { readItems, createItem, updateItem, deleteItem } from '@directus/sdk'
-import { parseISO } from 'date-fns'
 import type { 
   Flight, 
   Accommodation, 
@@ -8,6 +7,7 @@ import type {
   Insurance, 
   Trip 
 } from '~/types/directus'
+import { toFloatingLocalDate, toIsoZFromFloatingInput } from '~/utils/floatingDateTime'
 
 export interface TimelineItemNew {
   id: string
@@ -41,10 +41,12 @@ export const useTripOrganizationNew = () => {
       if (v.layovers && Array.isArray(v.layovers) && v.layovers.length > 0) {
         v.layovers.forEach((e: any, index) => {
           if (e.departure_time) {
+            const d = toFloatingLocalDate(e.departure_time)
+            if (!d) return
             items.push({
               id: `flight-${v.id}-scale-${index}`,
               type: 'flight',
-              date: new Date(e.departure_time),
+              date: d,
               title: `Vuelo a ${e.arrival_airport}`,
               subtitle: `${e.airline || 'Vuelo'} ${e.flight_number ? '• ' + e.flight_number : ''}`,
               originalItem: v,
@@ -53,10 +55,12 @@ export const useTripOrganizationNew = () => {
           }
         })
       } else if (v.departure_time) {
+        const d = toFloatingLocalDate(v.departure_time)
+        if (!d) return
         items.push({
           id: `flight-${v.id}`,
           type: 'flight',
-          date: new Date(v.departure_time),
+          date: d,
           title: `Vuelo a ${v.arrival_airport}`,
           subtitle: `${v.airline || 'Vuelo'} ${v.flight_number ? '• ' + v.flight_number : ''}`,
           originalItem: v
@@ -67,10 +71,12 @@ export const useTripOrganizationNew = () => {
     // 2. Accommodations
     accommodations.value.forEach(a => {
       if (a.check_in) {
+        const d = toFloatingLocalDate(a.check_in)
+        if (!d) return
         items.push({
           id: `accommodation-${a.id}`,
           type: 'accommodation',
-          date: new Date(a.check_in),
+          date: d,
           title: `Check-in: ${a.name}`,
           subtitle: a.address || a.city || 'Sin dirección',
           originalItem: a
@@ -83,10 +89,12 @@ export const useTripOrganizationNew = () => {
       if (t.stops && Array.isArray(t.stops) && t.stops.length > 0) {
         t.stops.forEach((e: any, index) => {
           if (e.departure_time) {
+            const d = toFloatingLocalDate(e.departure_time)
+            if (!d) return
             items.push({
               id: `transport-${t.id}-scale-${index}`,
               type: 'transport',
-              date: new Date(e.departure_time),
+              date: d,
               title: `${e.type || 'Transporte'}: ${e.departure_place} → ${e.arrival_place}`,
               subtitle: e.notes || '',
               originalItem: t,
@@ -95,10 +103,12 @@ export const useTripOrganizationNew = () => {
           }
         })
       } else if (t.start_date) {
+        const d = toFloatingLocalDate(t.start_date)
+        if (!d) return
         items.push({
           id: `transport-${t.id}`,
           type: 'transport',
-          date: new Date(t.start_date),
+          date: d,
           title: t.name,
           subtitle: t.category === 'pass' ? 'Activación de Pase' : 'Transporte',
           originalItem: t
@@ -111,10 +121,12 @@ export const useTripOrganizationNew = () => {
       const dateStr = act.start_date
 
       if (dateStr) {
+        const d = toFloatingLocalDate(dateStr)
+        if (!d) return
         items.push({
           id: `activity-${act.id}`,
           type: 'activity',
-          date: parseISO(dateStr),
+          date: d,
           title: act.title,
           subtitle: act.type ? act.type.charAt(0).toUpperCase() + act.type.slice(1) : 'Actividad',
           originalItem: act
@@ -172,10 +184,58 @@ export const useTripOrganizationNew = () => {
   }
 
   // --- CRUD Generic Helper ---
+  const normalizeDateTimeString = (v: any) => {
+    if (!v || typeof v !== 'string') return v
+    if (/[zZ]|[+-]\d{2}:\d{2}$/.test(v)) return v
+    const normalized = toIsoZFromFloatingInput(v.includes(' ') && !v.includes('T') ? v.replace(' ', 'T') : v)
+    return normalized || v
+  }
+
+  const normalizeItemDateTimes = (collection: string, item: any) => {
+    if (!item || typeof item !== 'object') return item
+    const data = { ...item }
+
+    if (collection === 'flights') {
+      if (data.departure_time) data.departure_time = normalizeDateTimeString(data.departure_time)
+      if (data.arrival_time) data.arrival_time = normalizeDateTimeString(data.arrival_time)
+      if (Array.isArray(data.layovers)) {
+        data.layovers = data.layovers.map((e: any) => ({
+          ...e,
+          departure_time: normalizeDateTimeString(e?.departure_time),
+          arrival_time: normalizeDateTimeString(e?.arrival_time)
+        }))
+      }
+    }
+
+    if (collection === 'accommodations') {
+      if (data.check_in) data.check_in = normalizeDateTimeString(data.check_in)
+      if (data.check_out) data.check_out = normalizeDateTimeString(data.check_out)
+    }
+
+    if (collection === 'transports') {
+      if (data.start_date) data.start_date = normalizeDateTimeString(data.start_date)
+      if (data.end_date) data.end_date = normalizeDateTimeString(data.end_date)
+      if (Array.isArray(data.stops)) {
+        data.stops = data.stops.map((e: any) => ({
+          ...e,
+          departure_time: normalizeDateTimeString(e?.departure_time),
+          arrival_time: normalizeDateTimeString(e?.arrival_time)
+        }))
+      }
+    }
+
+    if (collection === 'activities') {
+      if (data.start_date) data.start_date = normalizeDateTimeString(data.start_date)
+      if (data.end_date) data.end_date = normalizeDateTimeString(data.end_date)
+    }
+
+    return data
+  }
+
   const createItemGeneric = async (collection: string, item: any, state: any) => {
     try {
       const client = await getClient()
-      const res = await client.request(createItem(collection as any, item)) as any
+      const res = await client.request(createItem(collection as any, normalizeItemDateTimes(collection, item))) as any
       // res.attachments = [] 
       state.value.push(res)
       return res
@@ -188,7 +248,7 @@ export const useTripOrganizationNew = () => {
   const updateItemGeneric = async (collection: string, id: number, item: any, state: any) => {
     try {
       const client = await getClient()
-      const res = await client.request(updateItem(collection as any, id, item)) as any
+      const res = await client.request(updateItem(collection as any, id, normalizeItemDateTimes(collection, item))) as any
       
       const index = state.value.findIndex((i: any) => i.id === id)
       if (index !== -1) state.value[index] = { ...(state.value[index] || {}), ...(res || {}) }

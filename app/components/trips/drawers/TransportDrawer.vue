@@ -5,6 +5,7 @@
   import { useTripItemForm } from '~/composables/useTripItemForm'
   import { addDays, addHours, formatDateTime, formatDate } from '~/utils/dates'
   import { differenceInDays, differenceInHours } from 'date-fns'
+  import { nowFloatingIsoZ, toFloatingLocalDate } from '~/utils/floatingDateTime'
   import { 
     Drawer, 
     DrawerContent, 
@@ -98,9 +99,17 @@ import FileUploader from '~/components/ui/FileUploader/FileUploader.vue'
       // Calculate duration if editing a pass
       if (newItem.category === 'pass' && newItem.start_date && newItem.end_date) {
           if (newItem.duration_type === 'hours') {
-            formData.value.duracion_cantidad = differenceInHours(new Date(newItem.end_date), new Date(newItem.start_date))
+            const start = toFloatingLocalDate(newItem.start_date)
+            const end = toFloatingLocalDate(newItem.end_date)
+            if (start && end) {
+              formData.value.duracion_cantidad = differenceInHours(end, start)
+            }
           } else {
-            formData.value.duracion_cantidad = differenceInDays(new Date(newItem.end_date), new Date(newItem.start_date)) + 1
+            const start = toFloatingLocalDate(newItem.start_date)
+            const end = toFloatingLocalDate(newItem.end_date)
+            if (start && end) {
+              formData.value.duracion_cantidad = differenceInDays(end, start) + 1
+            }
           }
       }
     } else {
@@ -149,7 +158,11 @@ watch(isOpen, (isOpened) => {
       let derivedDestino = ''
       
       if (data.category === 'route' && data.stops && data.stops.length > 0) {
-        const sorted = [...data.stops].sort((a: any, b: any) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime())
+        const sorted = [...data.stops].sort((a: any, b: any) => {
+          const da = toFloatingLocalDate(a.departure_time)?.getTime() || 0
+          const db = toFloatingLocalDate(b.departure_time)?.getTime() || 0
+          return da - db
+        })
         
         const first = sorted[0]
         const last = sorted[sorted.length - 1]
@@ -248,8 +261,8 @@ watch(isOpen, (isOpened) => {
   const addEscala = () => {
     if (!formData.value.stops) formData.value.stops = []
     formData.value.stops.push({
-      departure_time: formData.value.start_date || new Date().toISOString(),
-      arrival_time: formData.value.start_date || new Date().toISOString(),
+      departure_time: formData.value.start_date || nowFloatingIsoZ(),
+      arrival_time: formData.value.start_date || nowFloatingIsoZ(),
       departure_place: '',
       arrival_place: '',
       type: 'train'

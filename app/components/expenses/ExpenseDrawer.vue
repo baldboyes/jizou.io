@@ -427,6 +427,7 @@ import { useGeolocation } from '~/composables/useGeolocation'
 import { useTripsNew } from '~/composables/useTripsNew'
 import { useDirectusRepo } from '~/composables/useDirectusRepo'
 import { useSharedExpenses } from '~/composables/useSharedExpenses'
+import { nowFloatingIsoZ, toIsoZFromFloatingInput } from '~/utils/floatingDateTime'
 
 const props = defineProps<{
   open: boolean
@@ -682,7 +683,13 @@ watch(() => props.open, async (newVal) => {
       form.category = expense.category
       
       // Ensure date is in ISO format for the picker
-      form.date = expense.timestamp ? expense.timestamp.replace(' ', 'T') : new Date().toISOString()
+      if (expense.timestamp) {
+        form.date = /[zZ]|[+-]\d{2}:\d{2}$/.test(expense.timestamp)
+          ? expense.timestamp
+          : (toIsoZFromFloatingInput(expense.timestamp.includes(' ') && !expense.timestamp.includes('T') ? expense.timestamp.replace(' ', 'T') : expense.timestamp) || expense.timestamp)
+      } else {
+        form.date = nowFloatingIsoZ()
+      }
       
       form.location = {
         coordinates: {
@@ -752,7 +759,7 @@ function resetForm() {
   form.amount = ''
   form.placeName = ''
   form.category = 'food'
-  form.date = new Date().toISOString()
+  form.date = nowFloatingIsoZ()
   form.location = {
     coordinates: { lat: 0, lng: 0 },
     city: '',
@@ -812,13 +819,9 @@ const isSharedValid = computed(() => {
 // Helper to format date for API (YYYY-MM-DD HH:MM)
 function formatTimestampForApi(isoString: string): string {
   if (!isoString) return ''
-  const date = new Date(isoString)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hours}:${minutes}`
+  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(isoString)) return isoString
+  const normalized = toIsoZFromFloatingInput(isoString.includes(' ') && !isoString.includes('T') ? isoString.replace(' ', 'T') : isoString)
+  return normalized || isoString
 }
 
 function buildSplitsForSave() {

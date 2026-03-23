@@ -16,6 +16,7 @@ import ItineraryDaysSwiper from '~/components/itinerary/ItineraryDaysSwiper.vue'
 import ItineraryDaysRail from '~/components/itinerary/ItineraryDaysRail.vue'
 import ItineraryDayList from '~/components/itinerary/ItineraryDayList.vue'
 import type { ExpenseCategory, PaymentMethod } from '~/types'
+import { nowFloatingDateTimeLocalInput, toIsoZFromFloatingInput } from '~/utils/floatingDateTime'
 
 definePageMeta({
   layout: 'dashboard'
@@ -41,7 +42,7 @@ const dayNavMode = useState<'swiper' | 'rail'>('itinerary-day-nav-mode', () => '
 // Expense State
 const isExpenseDialogOpen = ref(false)
 const expenseForm = ref({
-  date: new Date().toISOString().slice(0, 16),
+  date: nowFloatingDateTimeLocalInput(),
   concept: '',
   amount: 0,
   category: 'food' as ExpenseCategory,
@@ -64,7 +65,8 @@ onMounted(async () => {
 const handleCreateExpense = async () => {
   if (!expenseForm.value.concept || !expenseForm.value.amount) return
   try {
-    const timestamp = new Date(expenseForm.value.date).toISOString().replace('T', ' ').slice(0, 16)
+    const timestamp = toIsoZFromFloatingInput(expenseForm.value.date)
+    if (!timestamp) return
     
     await createExpense({
       timestamp: timestamp,
@@ -85,7 +87,7 @@ const handleCreateExpense = async () => {
     
     isExpenseDialogOpen.value = false
     expenseForm.value = {
-      date: new Date().toISOString().slice(0, 16),
+      date: nowFloatingDateTimeLocalInput(),
       concept: '',
       amount: 0,
       category: 'food',

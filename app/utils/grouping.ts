@@ -8,6 +8,7 @@
  */
 
 import { formatDateWithDayShort } from '~/utils/dates'
+import { toFloatingLocalDate } from '~/utils/floatingDateTime'
 
 export function groupByDate<T>(
   items: T[] | undefined | null, 
@@ -20,7 +21,10 @@ export function groupByDate<T>(
   const getDate = (item: T): Date | null => {
     const val = typeof dateField === 'function' ? dateField(item) : item[dateField]
     if (!val) return null
-    return new Date(val as string | number | Date)
+    if (val instanceof Date) return val
+    if (typeof val === 'string') return toFloatingLocalDate(val) || new Date(val)
+    if (typeof val === 'number') return new Date(val)
+    return null
   }
 
   // Sort by date

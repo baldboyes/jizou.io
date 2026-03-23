@@ -1,6 +1,7 @@
 import type { Expense } from '~/types'
 import { groupByDate } from '~/utils/grouping'
 import { getDateString } from '~/utils/dates'
+import { toFloatingLocalDate } from '~/utils/floatingDateTime'
 
 export function useGroupedExpenses(expenses: Ref<Expense[]>, itemsPerPage: number = 10) {
   const currentPage = ref(1)
@@ -17,7 +18,7 @@ export function useGroupedExpenses(expenses: Ref<Expense[]>, itemsPerPage: numbe
     
     // Sort items within groups (newest first)
     grouped.forEach(g => {
-        g.items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        g.items.sort((a, b) => (toFloatingLocalDate(b.timestamp)?.getTime() || 0) - (toFloatingLocalDate(a.timestamp)?.getTime() || 0))
     })
     
     // Sort groups by date descending (newest first)

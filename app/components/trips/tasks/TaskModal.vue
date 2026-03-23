@@ -45,21 +45,6 @@ const formData = ref<Partial<Task>>({
   entity_id: undefined
 })
 
-const toIsoLocal = (v: any): string | null => {
-  if (!v) return null
-  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v)) return v
-
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return null
-
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const da = String(d.getDate()).padStart(2, '0')
-  const h = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${y}-${m}-${da}T${h}:${min}`
-}
-
 const getPriorityDotClass = (priority: string) => {
   const color = TASK_PRIORITIES.find(p => p.value === priority)?.color || ''
   const bg = color.split(' ').find(c => c.startsWith('bg-'))
@@ -92,8 +77,6 @@ watch(() => props.open, (isOpen) => {
       if (formData.value.assigned_to === null) {
         formData.value.assigned_to = undefined
       }
-
-      formData.value.due_date = toIsoLocal((formData.value as any).due_date) || undefined
     } else {
       formData.value = {
         title: '',
@@ -145,7 +128,7 @@ const handleSave = async () => {
       description: formData.value.description,
       priority: formData.value.priority,
       status: formData.value.status,
-      due_date: toIsoLocal(formData.value.due_date) || undefined,
+      due_date: formData.value.due_date || undefined,
       task_group: formData.value.task_group,
       assigned_to: assignedTo as any,
       entity_type: formData.value.entity_type,

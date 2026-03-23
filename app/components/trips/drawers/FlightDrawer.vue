@@ -28,6 +28,7 @@ import FileUploader from '~/components/ui/FileUploader/FileUploader.vue'
 import FileList from '~/components/ui/FileList/FileList.vue'
 import { useDirectusRepo } from '~/composables/useDirectusRepo'
 import { readItem } from '@directus/sdk'
+import { toFloatingLocalDate, toIsoZFromFloatingDate } from '~/utils/floatingDateTime'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -117,7 +118,11 @@ const saveFlight = () => {
      }
 
      // Auto-calculate globals from segments
-     const sorted = [...data.layovers].sort((a: any, b: any) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime())
+    const sorted = [...data.layovers].sort((a: any, b: any) => {
+      const da = toFloatingLocalDate(a.departure_time)?.getTime() || 0
+      const db = toFloatingLocalDate(b.departure_time)?.getTime() || 0
+      return da - db
+    })
      
      data.departure_airport = sorted[0].departure_airport
      data.arrival_airport = sorted[sorted.length - 1].arrival_airport
@@ -150,9 +155,11 @@ const addEscala = async () => {
       // Suggest next flight 2 hours later
       if (last.arrival_time) {
         try {
-           const d = new Date(last.arrival_time)
-           d.setHours(d.getHours() + 2)
-           prevDate = d.toISOString().slice(0, 16)
+           const d = toFloatingLocalDate(last.arrival_time)
+           if (d) {
+             d.setHours(d.getHours() + 2)
+             prevDate = toIsoZFromFloatingDate(d)
+           }
         } catch(e) {}
       }
   }

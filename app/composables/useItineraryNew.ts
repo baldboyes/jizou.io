@@ -8,7 +8,6 @@ import {
   isSameDay, 
   addDays, 
   differenceInDays, 
-  parseISO, 
   startOfDay, 
   isWithinInterval, 
   differenceInCalendarDays, 
@@ -17,6 +16,7 @@ import {
 import { es } from 'date-fns/locale'
 import { Plane, Train, BedDouble, Ticket, Banknote, CheckSquare, Moon, MapPin } from 'lucide-vue-next'
 import { formatCurrency } from '~/utils/currency'
+import { toFloatingLocalDate } from '~/utils/floatingDateTime'
 
 export const useItineraryNew = () => {
   const { currentTrip } = useTripsNew()
@@ -36,7 +36,7 @@ export const useItineraryNew = () => {
   // Initialize selected date from trip start
   const initSelectedDate = () => {
     if (currentTrip.value?.start_date) {
-      selectedDate.value = parseISO(currentTrip.value.start_date)
+      selectedDate.value = toFloatingLocalDate(currentTrip.value.start_date) || new Date()
     }
   }
 
@@ -45,9 +45,10 @@ export const useItineraryNew = () => {
   const tripDays = computed(() => {
     if (!currentTrip.value?.start_date) return []
     
-    const start = parseISO(currentTrip.value.start_date)
+    const start = toFloatingLocalDate(currentTrip.value.start_date)
+    if (!start) return []
     // Fallback to 14 days if no end date
-    const end = currentTrip.value.end_date ? parseISO(currentTrip.value.end_date) : addDays(start, 14)
+    const end = currentTrip.value.end_date ? (toFloatingLocalDate(currentTrip.value.end_date) || addDays(start, 14)) : addDays(start, 14)
     
     try {
         return eachDayOfInterval({ start, end })
@@ -77,8 +78,11 @@ export const useItineraryNew = () => {
        // Accommodations
        const accs = accommodations.value.map(a => {
           if (!a.check_in || !a.check_out) return null
-          const start = startOfDay(parseISO(a.check_in))
-          const end = startOfDay(parseISO(a.check_out))
+          const startRaw = toFloatingLocalDate(a.check_in)
+          const endRaw = toFloatingLocalDate(a.check_out)
+          if (!startRaw || !endRaw) return null
+          const start = startOfDay(startRaw)
+          const end = startOfDay(endRaw)
           
           if (dayDate >= start && dayDate < end) {
              let status = 'middle'
@@ -106,8 +110,11 @@ export const useItineraryNew = () => {
        // Assuming 'pass_id' presence or category 'pass' indicates a pass
        const passes = transports.value.filter(t => t.category === 'pass' || !!t.pass_id).map(t => {
           if (!t.start_date || !t.end_date) return null
-          const start = startOfDay(parseISO(t.start_date))
-          const end = startOfDay(parseISO(t.end_date))
+          const startRaw = toFloatingLocalDate(t.start_date)
+          const endRaw = toFloatingLocalDate(t.end_date)
+          if (!startRaw || !endRaw) return null
+          const start = startOfDay(startRaw)
+          const end = startOfDay(endRaw)
           
           if (dayDate >= start && dayDate <= end) {
               let status = 'middle'
@@ -137,7 +144,8 @@ export const useItineraryNew = () => {
        flights.value.forEach(v => {
           if (v.layovers && Array.isArray(v.layovers) && v.layovers.length > 0) {
              v.layovers.forEach((escala: any, index) => {
-                if (escala.departure_time && isSameDay(startOfDay(parseISO(escala.departure_time)), dayDate)) {
+                const dep = escala.departure_time ? toFloatingLocalDate(escala.departure_time) : null
+                if (dep && isSameDay(startOfDay(dep), dayDate)) {
                    flts.push({
                      id: `flight-${v.id}-leg-${index}`,
                      title: escala.airline ? `${escala.airline}` : 'Vuelo',
@@ -146,13 +154,16 @@ export const useItineraryNew = () => {
                    })
                 }
              })
-          } else if (v.departure_time && isSameDay(startOfDay(parseISO(v.departure_time)), dayDate)) {
+          } else {
+            const dep = v.departure_time ? toFloatingLocalDate(v.departure_time) : null
+            if (dep && isSameDay(startOfDay(dep), dayDate)) {
                flts.push({
                   id: `flight-${v.id}`,
                   title: v.airline || 'Vuelo',
                   type: 'flight',
                   icon: Plane
                })
+            }
           }
        })
        
@@ -166,8 +177,11 @@ export const useItineraryNew = () => {
          const cityName = d.city || d.ciudad
 
          if (!dStartStr || !dEndStr) return null
-         const start = startOfDay(parseISO(dStartStr))
-         const end = startOfDay(parseISO(dEndStr))
+         const startRaw = toFloatingLocalDate(dStartStr)
+         const endRaw = toFloatingLocalDate(dEndStr)
+         if (!startRaw || !endRaw) return null
+         const start = startOfDay(startRaw)
+         const end = startOfDay(endRaw)
          
          if (dayDate >= start && dayDate <= end) {
              let status = 'middle'
@@ -226,14 +240,16 @@ export const useItineraryNew = () => {
       if (v.layovers && Array.isArray(v.layovers) && v.layovers.length > 0) {
         v.layovers.forEach((escala: any, index) => {
            if (escala.departure_time) {
-              const start = parseISO(escala.departure_time)
+              const start = toFloatingLocalDate(escala.departure_time)
+              if (!start) return
               
               if (isSameDay(start, current)) {
                 let timeStr = format(start, 'HH:mm')
                 let dayDiff = 0
                 
                 if (escala.arrival_time) {
-                  const end = parseISO(escala.arrival_time)
+                  const end = toFloatingLocalDate(escala.arrival_time)
+                  if (!end) return
                   timeStr += ` - ${format(end, 'HH:mm')}`
                   dayDiff = differenceInCalendarDays(end, start)
                 }
@@ -252,14 +268,16 @@ export const useItineraryNew = () => {
            }
         })
       } else if (v.departure_time) {
-        const start = parseISO(v.departure_time)
+        const start = toFloatingLocalDate(v.departure_time)
+        if (!start) return
         
         if (isSameDay(start, current)) {
             let timeStr = format(start, 'HH:mm')
             let dayDiff = 0
 
             if (v.arrival_time) {
-              const end = parseISO(v.arrival_time)
+              const end = toFloatingLocalDate(v.arrival_time)
+              if (!end) return
               timeStr += ` - ${format(end, 'HH:mm')}`
               dayDiff = differenceInCalendarDays(end, start)
             }
@@ -281,8 +299,9 @@ export const useItineraryNew = () => {
     // 2. Accommodations
     accommodations.value.forEach(a => {
         if (a.check_in && a.check_out) {
-          const checkIn = parseISO(a.check_in)
-          const checkOut = parseISO(a.check_out)
+          const checkIn = toFloatingLocalDate(a.check_in)
+          const checkOut = toFloatingLocalDate(a.check_out)
+          if (!checkIn || !checkOut) return
           
           const checkInDate = startOfDay(checkIn)
           const checkOutDate = startOfDay(checkOut)
@@ -345,8 +364,11 @@ export const useItineraryNew = () => {
     // 3. Active Passes
     transports.value.filter(t => t.category === 'pass' || !!t.pass_id).forEach(t => {
       if (t.start_date && t.end_date) {
-        const start = startOfDay(parseISO(t.start_date))
-        const end = startOfDay(parseISO(t.end_date))
+        const startRaw = toFloatingLocalDate(t.start_date)
+        const endRaw = toFloatingLocalDate(t.end_date)
+        if (!startRaw || !endRaw) return
+        const start = startOfDay(startRaw)
+        const end = startOfDay(endRaw)
         
         if (current >= start && current <= end) {
           events.unshift({
@@ -393,16 +415,17 @@ export const useItineraryNew = () => {
 
     // 5. Tasks
     tasks.value.forEach(task => {
-      if (task.due_date && isSameDay(parseISO(task.due_date), current)) {
+      const due = task.due_date ? toFloatingLocalDate(task.due_date) : null
+      if (due && isSameDay(due, current)) {
         events.push({
           id: `task-${task.id}`,
           type: 'task',
-          date: parseISO(task.due_date),
+          date: due,
           title: task.title,
           subtitle: 'Tarea',
           icon: CheckSquare,
           colorClass: 'bg-yellow-100 text-yellow-600',
-          time: parseISO(task.due_date).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit', hour12: false})
+          time: format(due, 'HH:mm')
         })
       }
     })
@@ -410,16 +433,17 @@ export const useItineraryNew = () => {
     // 6. Expenses
     expenses.value.forEach(ex => {
       // AppExpense uses 'timestamp' string (ISO)
-      if (ex.timestamp && isSameDay(parseISO(ex.timestamp), current)) {
+      const ts = ex.timestamp ? toFloatingLocalDate(ex.timestamp) : null
+      if (ts && isSameDay(ts, current)) {
         events.push({
           id: `expense-${ex.id}`,
           type: 'expense',
-          date: parseISO(ex.timestamp),
+          date: ts,
           title: ex.placeName,
           subtitle: `${formatCurrency(ex.amount, 'JPY')} • ${ex.category}`,
           icon: Banknote,
           colorClass: 'bg-red-50 text-red-600',
-          time: parseISO(ex.timestamp).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit', hour12: false})
+          time: format(ts, 'HH:mm')
         })
       }
     })
@@ -436,8 +460,8 @@ export const useItineraryNew = () => {
     })
 
     otherEvents.sort((a, b) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0
-      const dateB = b.date ? new Date(b.date).getTime() : 0
+      const dateA = a.date ? a.date.getTime() : 0
+      const dateB = b.date ? b.date.getTime() : 0
       return dateA - dateB
     })
 

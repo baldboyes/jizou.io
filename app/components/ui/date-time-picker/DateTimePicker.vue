@@ -9,6 +9,7 @@ import { Label } from '~/components/ui/label'
 import { cn } from '~/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { toDateTimeLocalInput, toFloatingLocalDate, toIsoZFromFloatingDate } from '~/utils/floatingDateTime'
 import { 
   parseDate, 
   type DateValue 
@@ -37,12 +38,12 @@ const dateVal = ref<DateValue | undefined>(undefined)
 // Initialize from props
 watch(() => props.modelValue, (newVal) => {
   if (newVal) {
-    const d = new Date(newVal)
-    if (!isNaN(d.getTime())) {
+    const d = toFloatingLocalDate(newVal)
+    if (d && !isNaN(d.getTime())) {
       hours.value = String(d.getHours()).padStart(2, '0')
       minutes.value = String(d.getMinutes()).padStart(2, '0')
-      
-      const isoDate = newVal.split('T')[0]
+
+      const isoDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       try {
         // Only update dateVal if different to avoid loop
         const parsed = parseDate(isoDate)
@@ -81,14 +82,8 @@ const updateModel = () => {
   // Create JS Date from components
   // Note: DateValue from reka-ui has .year, .month, .day
   const jsDate = new Date(d.year, d.month - 1, d.day, Number(hours.value), Number(minutes.value))
-  
-  const y = jsDate.getFullYear()
-  const m = String(jsDate.getMonth() + 1).padStart(2, '0')
-  const da = String(jsDate.getDate()).padStart(2, '0')
-  const h = String(jsDate.getHours()).padStart(2, '0')
-  const min = String(jsDate.getMinutes()).padStart(2, '0')
-  
-  const isoLocal = `${y}-${m}-${da}T${h}:${min}`
+  const isoLocal = toDateTimeLocalInput(jsDate)
+  const isoZ = toIsoZFromFloatingDate(jsDate)
   
   // If hiding time, we still emit ISO with time, but it will be 00:00 or default.
   // Actually, if we hide time, we should probably respect that visually but the value
@@ -99,8 +94,8 @@ const updateModel = () => {
   // but the UI hides the time picker.
   
   // Avoid emitting if same as prop to prevent loops
-  if (isoLocal !== props.modelValue) {
-    emit('update:modelValue', isoLocal)
+  if (isoLocal && isoLocal !== toDateTimeLocalInput(props.modelValue)) {
+    emit('update:modelValue', isoZ)
   }
 }
 
@@ -111,7 +106,9 @@ const formattedDate = computed(() => {
   if (!props.modelValue) return null
   try {
     const formatStr = props.hideTime ? "PPP" : "PPP HH:mm"
-    return format(new Date(props.modelValue), formatStr, { locale: es })
+    const d = toFloatingLocalDate(props.modelValue)
+    if (!d) return null
+    return format(d, formatStr, { locale: es })
   } catch (e) {
     return null
   }

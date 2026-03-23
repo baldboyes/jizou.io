@@ -14,6 +14,7 @@ import { getCategoryInfo } from '~/types'
 import type { DateFilterRange } from '~/components/common/DateRangeFilter.vue'
 import { formatDate, getDateString } from '~/utils/dates'
 import { groupByDate } from '~/utils/grouping'
+import { nowFloatingDateTimeLocalInput, toFloatingLocalDate, toIsoZFromFloatingInput } from '~/utils/floatingDateTime'
 import ExpenseDrawer from '~/components/expenses/ExpenseDrawer.vue'
 import ExpensesFilters from '~/components/expenses/Filters.vue'
 import ExpensesGroupedList from '~/components/expenses/GroupedList.vue'
@@ -165,7 +166,7 @@ const walletFormData = ref<{
   lugar: string
   destino_fondo: 'cash' | 'card' | 'ic' // Updated to English
 }>({
-  fecha: new Date().toISOString().slice(0, 16),
+  fecha: nowFloatingDateTimeLocalInput(),
   origen_eur: 0,
   destino_jpy: 0,
   lugar: '',
@@ -174,8 +175,10 @@ const walletFormData = ref<{
 
 const handleWalletSave = async () => {
   try {
+    const isoZ = toIsoZFromFloatingInput(walletFormData.value.fecha)
+    if (!isoZ) return
     await createCambio({
-      date: new Date(walletFormData.value.fecha).toISOString(), // Map to ISO
+      date: isoZ,
       amount_from: walletFormData.value.origen_eur,
       currency_from: 'EUR',
       amount_to: walletFormData.value.destino_jpy,
@@ -187,7 +190,7 @@ const handleWalletSave = async () => {
     isWalletModalOpen.value = false
     // Reset form
     walletFormData.value = {
-      fecha: new Date().toISOString().slice(0, 16),
+      fecha: nowFloatingDateTimeLocalInput(),
       origen_eur: 0,
       destino_jpy: 0,
       lugar: '',
@@ -215,7 +218,7 @@ const formatJPY = (v: number) => {
 
 const mapToPlannedExpense = (e: Expense): PlannedExpense => ({
   id: e.id,
-  plannedDate: e.timestamp.split(' ')[0] || e.timestamp,
+  plannedDate: getDateString(e.timestamp),
   placeName: e.placeName,
   amount: e.amount,
   category: e.category,
@@ -268,7 +271,7 @@ const filteredExpenses = computed(() => {
   // Date filter
   if (dateRange.value.start && dateRange.value.end) {
     result = result.filter(e => {
-      const expenseDate = new Date(e.timestamp)
+      const expenseDate = toFloatingLocalDate(e.timestamp) || new Date(e.timestamp)
       return expenseDate >= dateRange.value.start! && expenseDate <= dateRange.value.end!
     })
   }
