@@ -534,6 +534,26 @@ function ensurePaidByIsValid() {
   }
 }
 
+watch(paidByTripUserId, (next) => {
+  if (!form.shared) return
+  const id = Number(next ?? 0)
+  if (!id) return
+  if (!selectedTripUserIds.value.includes(id)) {
+    selectedTripUserIds.value.push(id)
+    splitDraft.value = {
+      ...splitDraft.value,
+      [id]: splitDraft.value[id] || { amount: 0, percentage: 0 }
+    }
+  }
+  if (sharedSplitMode.value === 'equal') {
+    recomputeEqualSplits()
+  } else if (lastEditedSplitField.value === 'amount') {
+    recomputeFromAmounts()
+  } else {
+    recomputeFromPercentages()
+  }
+})
+
 function recomputeEqualSplits() {
   sharedSplitError.value = null
   const total = totalAmount.value

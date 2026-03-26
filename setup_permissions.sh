@@ -44,7 +44,7 @@ echo "🚀 Configurando permisos para la Política 'App User' ($POLICY_ID)..."
 TRIP_READ_RULE='{
   "_or": [
     { "user_created": { "_eq": "$CURRENT_USER" } },
-    { "collaborators": { "directus_user_id": { "_eq": "$CURRENT_USER" } } }
+    { "collaborators": { "_some": { "directus_user_id": { "_eq": "$CURRENT_USER" } } } }
   ]
 }'
 create_permission "trips" "read" "$TRIP_READ_RULE"
@@ -70,14 +70,14 @@ create_permission "trips" "delete" '{ "user_created": { "_eq": "$CURRENT_USER" }
 DEPENDENT_READ_RULE='{
   "_or": [
     { "user_created": { "_eq": "$CURRENT_USER" } },
-    { "trip_id": { "collaborators": { "directus_user_id": { "_eq": "$CURRENT_USER" } } } },
+    { "trip_id": { "collaborators": { "_some": { "directus_user_id": { "_eq": "$CURRENT_USER" } } } } },
     { "trip_id": { "user_created": { "_eq": "$CURRENT_USER" } } }
   ]
 }'
 
 DEPENDENT_READ_RULE_NO_ITEM_USER_CREATED='{
   "_or": [
-    { "trip_id": { "collaborators": { "directus_user_id": { "_eq": "$CURRENT_USER" } } } },
+    { "trip_id": { "collaborators": { "_some": { "directus_user_id": { "_eq": "$CURRENT_USER" } } } } },
     { "trip_id": { "user_created": { "_eq": "$CURRENT_USER" } } }
   ]
 }'

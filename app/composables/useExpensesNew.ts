@@ -1,4 +1,4 @@
-import { readItems, createItem, updateItem, deleteItem } from '@directus/sdk'
+import { createItem, updateItem, deleteItem } from '@directus/sdk'
 import type { Expense as DirectusExpense } from '~/types/directus'
 import type { Expense as AppExpense, ExpenseCategory, PaymentMethod } from '~/types'
 
@@ -60,28 +60,12 @@ export const useExpensesNew = () => {
     loading.value = true
     error.value = null
     try {
-      const client = await getClient()
-      const result = await client.request(readItems('expenses', {
-        filter: { trip_id: { _eq: Number(tripId) } },
-        fields: [
-          'id',
-          'date',
-          'concept',
-          'amount',
-          'category',
-          'notes',
-          'payment_method',
-          'is_shared',
-          'paid_by_trip_user_id',
-          'expense_status',
-          'location_lat',
-          'location_lng',
-          'city',
-          'prefectura',
-          'user_created'
-        ],
-        sort: ['-date']
-      }))
+      const apiRes = await $fetch('/api/trips/expenses', {
+        method: 'GET',
+        query: { tripId: Number(tripId) }
+      }).catch(() => null) as any
+
+      const result = Array.isArray(apiRes?.expenses) ? apiRes.expenses : []
       
       if (Array.isArray(result)) {
         expenses.value = result.map(mapDirectusToApp)
