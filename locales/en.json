@@ -100,6 +100,9 @@
         "percentages_must_equal_100": "Split percentages must add up to 100%"
       }
     },
+    "card": {
+      "shared_participants_aria": "Shared expense participants"
+    },
     "toasts": {
       "shared_created": "Shared expense added",
       "shared_updated": "Shared expense updated",

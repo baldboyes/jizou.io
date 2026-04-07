@@ -20,8 +20,32 @@
             <h3 class="font-semibold text-neutral-900 truncate">
               {{ expense.placeName }}
             </h3>
-            <div class="flex-shrink-0 font-bold text-neutral-900">
-              {{ formattedAmount }}
+            <div class="flex shrink-0 items-center gap-2">
+              <div
+                v-if="expense.shared && visibleSharedAvatars.length > 0"
+                class="flex items-center -space-x-1"
+                :aria-label="$t('expenses.card.shared_participants_aria')"
+              >
+                <Avatar
+                  v-for="p in visibleSharedAvatars"
+                  :key="p.key"
+                  size="xs"
+                  class="border border-white bg-white shadow-sm ring-1 ring-black/5"
+                >
+                  <AvatarImage v-if="p.src" :src="p.src" />
+                  <AvatarFallback class="text-[10px] font-semibold">{{ p.fallback }}</AvatarFallback>
+                </Avatar>
+                <Avatar
+                  v-if="extraSharedCount > 0"
+                  size="xs"
+                  class="border border-white bg-white shadow-sm ring-1 ring-black/5"
+                >
+                  <AvatarFallback class="text-[10px] font-semibold">{{ String(extraSharedCount) }}</AvatarFallback>
+                </Avatar>
+              </div>
+              <div class="font-bold text-neutral-900">
+                {{ formattedAmount }}
+              </div>
             </div>
           </div>
           <div class="flex items-center justify-between gap-1">
@@ -68,11 +92,15 @@
   import { useCurrency } from '~/composables/useCurrency'
   import { CURRENCIES } from '~/composables/useSettings'
   import CommonPaymentMethodBadge from '~/components/common/PaymentMethodBadge.vue'
+  import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 
   const { formatAmount: globalFormat } = useCurrency()
 
+  type SharedAvatar = { src?: string | null; fallback: string }
+
   interface Props {
     expense: Expense
+    sharedAvatars?: SharedAvatar[]
     currency?: string
   }
 
@@ -95,4 +123,18 @@
     }
     return globalFormat(props.expense.amount)
   })
+
+  const normalizedSharedAvatars = computed(() => {
+    const input = Array.isArray(props.sharedAvatars) ? props.sharedAvatars : []
+    return input
+      .filter((p) => !!p && typeof p.fallback === 'string' && p.fallback.length > 0)
+      .map((p, idx) => ({
+        key: `${idx}:${p.fallback}:${String(p.src || '')}`,
+        src: p.src || null,
+        fallback: String(p.fallback).slice(0, 2)
+      }))
+  })
+
+  const visibleSharedAvatars = computed(() => normalizedSharedAvatars.value.slice(0, 3))
+  const extraSharedCount = computed(() => Math.max(0, normalizedSharedAvatars.value.length - visibleSharedAvatars.value.length))
 </script>

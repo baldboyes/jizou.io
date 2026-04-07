@@ -42,6 +42,7 @@
             v-for="expense in group.items"
             :key="expense.id"
             :expense="expense"
+            :shared-avatars="sharedAvatarsByExpenseId?.[expense.id]"
             :currency="currency"
             @click="$emit('expense-click', expense)"
           />
@@ -75,6 +76,7 @@ const { formatAmount: globalFormatAmount } = useCurrency()
 interface Props {
   expenses: Expense[]
   plannedExpenses?: PlannedExpense[]
+  sharedAvatarsByExpenseId?: Record<string, { src?: string | null; fallback: string }[]>
   emptyTitle?: string
   emptyMessage?: string
   currency?: string

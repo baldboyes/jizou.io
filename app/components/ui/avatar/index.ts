@@ -5,6 +5,7 @@ export const avatarVariant = tv({
   base: 'relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full',
   variants: {
     size: {
+      xs: 'h-6 w-6 text-[10px]',
       sm: 'h-8 w-8 text-xs',
       base: 'h-10 w-10',
       lg: 'h-12 w-12',

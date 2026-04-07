@@ -361,8 +361,12 @@ function handleDelete(expense: Expense) {
   }
 }
 
-function handleDrawerSuccess() {
-  fetchExpenses(tripId.value)
+async function handleDrawerSuccess() {
+  const id = Number(tripId.value)
+  await Promise.all([
+    fetchExpenses(id),
+    refreshSharedData(id)
+  ])
 }
 
 // Handle planned expense click - convert to real expense
@@ -422,7 +426,7 @@ const sharedByPerson = computed(() => {
     .sort((a, b) => b.amount - a.amount)
 })
 
-type TripParticipant = { tripUserId: number; label: string; userId: string | null }
+type TripParticipant = { tripUserId: number; label: string; userId: string | null; avatarUrl: string | null }
 type SuggestedTransfer = { fromTripUserId: number; toTripUserId: number; amount: number }
 
 const tripParticipants = computed<TripParticipant[]>(() => {
@@ -435,7 +439,8 @@ const tripParticipants = computed<TripParticipant[]>(() => {
       const last = String(c?.last_name || '').trim()
       const email = String(c?.email || '').trim()
       const label = (first || last) ? `${first} ${last}`.trim() : (email || String(c?.id || ''))
-      return { tripUserId, label, userId: c?.id ? String(c.id) : null }
+      const avatarUrl = c?.avatar_url ? String(c.avatar_url) : null
+      return { tripUserId, label, userId: c?.id ? String(c.id) : null, avatarUrl }
     })
     .filter(Boolean) as TripParticipant[]
 })
@@ -443,6 +448,12 @@ const tripParticipants = computed<TripParticipant[]>(() => {
 const participantLabelById = computed(() => {
   const m = new Map<number, string>()
   for (const p of tripParticipants.value) m.set(p.tripUserId, p.label)
+  return m
+})
+
+const participantAvatarById = computed(() => {
+  const m = new Map<number, string | null>()
+  for (const p of tripParticipants.value) m.set(p.tripUserId, p.avatarUrl)
   return m
 })
 
@@ -458,6 +469,33 @@ const sharedExpenseIdSet = computed(() => new Set(sharedExpenses.value.map(e => 
 const sharedSplits = computed(() => {
   const set = sharedExpenseIdSet.value
   return (tripExpenseSplits.value || []).filter((s: any) => set.has(Number(s?.expense_id)))
+})
+
+const sharedAvatarsByExpenseId = computed<Record<string, { src?: string | null; fallback: string }[]>>(() => {
+  const labelById = participantLabelById.value
+  const avatarById = participantAvatarById.value
+  const byExpense = new Map<number, Map<number, { src?: string | null; fallback: string }>>()
+
+  for (const s of sharedSplits.value as any[]) {
+    const expenseId = Number(s?.expense_id ?? 0)
+    const tripUserId = Number(s?.trip_user_id ?? 0)
+    const amount = Number(s?.amount ?? 0)
+    if (!expenseId || !tripUserId) continue
+    if (!Number.isFinite(amount) || amount <= 0) continue
+
+    const label = labelById.get(tripUserId) || String(tripUserId)
+    const src = avatarById.get(tripUserId) || null
+    const fallback = label.trim().slice(0, 1) || String(tripUserId).slice(0, 1)
+
+    if (!byExpense.has(expenseId)) byExpense.set(expenseId, new Map())
+    byExpense.get(expenseId)!.set(tripUserId, { src, fallback })
+  }
+
+  const out: Record<string, { src?: string | null; fallback: string }[]> = {}
+  for (const [expenseId, people] of byExpense.entries()) {
+    out[String(expenseId)] = Array.from(people.values())
+  }
+  return out
 })
 
 const statsScope = ref<'me' | 'trip'>('me')
@@ -735,6 +773,7 @@ const handleDeleteSettlement = async (id: number | string) => {
         <ExpensesGroupedList
           :expenses="filteredExpenses"
           :planned-expenses="filteredPlannedExpenses"
+          :shared-avatars-by-expense-id="sharedAvatarsByExpenseId"
           :currency="budget.currency || undefined"
           :empty-title="$t('trip_expenses_page.empty.title')"
           :empty-message="$t('trip_expenses_page.empty.subtitle')"

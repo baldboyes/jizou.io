@@ -100,6 +100,9 @@
         "percentages_must_equal_100": "分割した割合の合計は100%である必要があります"
       }
     },
+    "card": {
+      "shared_participants_aria": "共有の支出の参加者"
+    },
     "toasts": {
       "shared_created": "共有の支出を追加しました",
       "shared_updated": "共有の支出を更新しました",

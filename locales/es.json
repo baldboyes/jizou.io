@@ -100,6 +100,9 @@
         "percentages_must_equal_100": "La suma de los porcentajes debe ser 100%"
       }
     },
+    "card": {
+      "shared_participants_aria": "Participantes del gasto compartido"
+    },
     "toasts": {
       "shared_created": "Gasto compartido añadido",
       "shared_updated": "Gasto compartido actualizado",
