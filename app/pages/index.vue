@@ -1,15 +1,20 @@
 <template>
 
-    <div class="h-screen w-full flex flex-col items-center justify-center" v-if="!isLoaded">
-      <!-- Spinner o Skeleton de carga inicial mientras Clerk verifica -->
-      <div class="animate-pulse flex flex-col items-center gap-4">
-        <div class="h-12 w-12 rounded-full bg-slate-200"></div>
-        <div class="h-4 w-32 rounded bg-slate-200"></div>
+    <div class="h-screen w-full flex flex-col items-center justify-center bg-neutral-50" v-if="!isLoaded">
+      <!-- Spinner inicial (Splash Screen) mientras Clerk verifica sesión -->
+      <div class="animate-pulse flex flex-col items-center gap-6">
+        <div class="relative flex items-center justify-center">
+          <div class="absolute inset-0 bg-purple-200 rounded-full blur-xl opacity-50 animate-pulse"></div>
+          <img src="/icon-192x192.png" alt="jizou.io logo" class="w-20 h-20 relative z-10 drop-shadow-md" />
+        </div>
+        <div class="h-2 w-24 bg-purple-100 rounded-full overflow-hidden">
+          <div class="h-full bg-purple-500 rounded-full w-1/2 animate-[bounce_1s_infinite]"></div>
+        </div>
       </div>
     </div>
     
     <div v-else>
-      <div v-if="!userId">
+      <template v-if="!userId">
         <!-- Hero Section -->
         <section class="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
           <!-- Background Effects -->
@@ -162,6 +167,16 @@
           </div>
         </section>
 
+      </template>
+      <div v-else class="h-screen w-full flex flex-col items-center justify-center bg-neutral-50">
+        <!-- Pantalla de carga mientras carga viajes para redirigir -->
+        <div class="animate-pulse flex flex-col items-center gap-6">
+          <div class="relative flex items-center justify-center">
+            <div class="absolute inset-0 bg-purple-200 rounded-full blur-xl opacity-50 animate-pulse"></div>
+            <img src="/icon-192x192.png" alt="jizou.io logo" class="w-20 h-20 relative z-10 drop-shadow-md" />
+          </div>
+          <p class="text-slate-500 font-medium animate-pulse">{{ $t('landing.loading_redirecting') }}</p>
+        </div>
       </div>
     </div>
 

@@ -1111,6 +1111,7 @@
   },
   "welcome": "Bienvenido",
   "landing": {
+    "loading_redirecting": "Cargando tus viajes...",
     "new_version": "Nueva versión disponible",
     "hero": {
       "title_start": "Tu viaje completo,",

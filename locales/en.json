@@ -1111,6 +1111,7 @@
   },
   "welcome": "Welcome",
   "landing": {
+    "loading_redirecting": "Loading your trips...",
     "new_version": "New version available",
     "hero": {
       "title_start": "Your complete trip,",
