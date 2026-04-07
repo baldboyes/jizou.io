@@ -891,6 +891,11 @@
       "directions_prefix": "行き方:",
       "open_maps": "Googleマップを開く"
     },
+    "offline": {
+      "offline_badge": "Offline",
+      "pending_prefix": "Pending",
+      "pending_suffix": "to sync"
+    },
     "tabs": {
       "expenses": "Expenses",
       "itinerary": "Itinerary"

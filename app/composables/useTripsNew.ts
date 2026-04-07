@@ -1,6 +1,8 @@
 import { readItems, readItem, createItem, updateItem, deleteItem } from '@directus/sdk'
 import type { Trip } from '~/types/directus'
 import { useI18n } from '#imports'
+import { offlineKvGet, offlineKvSet } from '~/utils/offlineDb'
+import { buildOfflineKey, getOfflineUserId } from '~/utils/offlineKeys'
 
 export const useTripsNew = () => {
   const { getClient, directusUserId } = useDirectusRepo()
@@ -74,18 +76,31 @@ export const useTripsNew = () => {
     loading.value = true
     error.value = null
     try {
+      const userId = getOfflineUserId()
+      if (userId && Number.isFinite(id) && id > 0) {
+        const cached = await offlineKvGet<Trip>(buildOfflineKey(userId, ['trip', id, 'trip']))
+        if (cached) currentTrip.value = cached as Trip
+      }
+
       const client = await getClient()
       const result = await client.request(readItem('trips', id, {
           fields: ['*', 'expenses.*', 'activities.*', 'accommodations.*', 'flights.*', 'transports.*', 'tasks.*']
       }))
       currentTrip.value = result as Trip
       await fetchCollaborators(id)
+      if (userId && Number.isFinite(id) && id > 0) {
+        await offlineKvSet(buildOfflineKey(userId, ['trip', id, 'trip']), currentTrip.value)
+      }
       return result
     } catch (e: any) {
       try {
         const res = await $fetch('/api/trips/item', { method: 'GET', query: { tripId: id } }) as any
         currentTrip.value = (res?.trip || null) as any
         await fetchCollaborators(id)
+        const userId = getOfflineUserId()
+        if (userId && Number.isFinite(id) && id > 0 && currentTrip.value) {
+          await offlineKvSet(buildOfflineKey(userId, ['trip', id, 'trip']), currentTrip.value)
+        }
         return res?.trip
       } catch (fallbackError: any) {
         console.error(e)

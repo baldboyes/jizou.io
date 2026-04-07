@@ -891,6 +891,11 @@
       "directions_prefix": "Cómo llegar a",
       "open_maps": "Abrir enlace de Google Maps"
     },
+    "offline": {
+      "offline_badge": "Sin conexión",
+      "pending_prefix": "Pendientes",
+      "pending_suffix": "por sincronizar"
+    },
     "tabs": {
       "expenses": "Gastos",
       "itinerary": "Itinerario"

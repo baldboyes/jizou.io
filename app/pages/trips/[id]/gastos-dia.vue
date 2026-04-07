@@ -18,7 +18,13 @@
         </Button>
 
       </div>
-      <WeatherWidget :weather="weather" :loading="weatherLoading" />
+      <div class="flex items-center gap-2">
+        <Badge v-if="!isOnline" variant="secondary">{{ $t('trip_daily_expenses_page.offline.offline_badge') }}</Badge>
+        <Badge v-else-if="pendingCreateCount > 0" variant="secondary">
+          {{ $t('trip_daily_expenses_page.offline.pending_prefix') }} {{ pendingCreateCount }} {{ $t('trip_daily_expenses_page.offline.pending_suffix') }}
+        </Badge>
+        <WeatherWidget :weather="weather" :loading="weatherLoading" />
+      </div>
     </div>
 
     <!-- Daily Budget Card -->
@@ -134,6 +140,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useOnline } from '@vueuse/core'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { BedDouble, LayoutDashboard } from 'lucide-vue-next'
@@ -171,7 +178,7 @@ definePageMeta({
 const route = useRoute()
 const tripId = computed(() => Number(route.params.id))
 
-const { expenses, fetchExpenses, updateExpense, deleteExpense } = useExpensesNew()
+const { expenses, fetchExpenses, updateExpense, deleteExpense, syncPendingExpenseCreates, pendingCreateCountByTrip } = useExpensesNew()
 const { accommodations, fetchOrganizationData } = useTripOrganizationNew()
 const { fetchTasks } = useTripTasksNew()
 const { currentTrip, getTrip } = useTripsNew()
@@ -179,6 +186,8 @@ const { weather, loading: weatherLoading, loadWeatherForTrip } = useTripWeather(
 const { selectedDate, selectedDayDetails, selectDate } = useItineraryNew()
 
 const viewMode = ref<'expenses' | 'itinerary'>('expenses')
+const isOnline = useOnline()
+const pendingCreateCount = computed(() => pendingCreateCountByTrip.value[String(tripId.value)] || 0)
 
 // Load data
 onMounted(async () => {
@@ -188,6 +197,10 @@ onMounted(async () => {
       fetchOrganizationData(tripId.value),
       fetchTasks(tripId.value)
     ])
+
+    if (isOnline.value && pendingCreateCount.value > 0) {
+      await syncPendingExpenseCreates(tripId.value)
+    }
     
     // Get trip data and then load weather
     await getTrip(tripId.value)

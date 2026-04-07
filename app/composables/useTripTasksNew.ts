@@ -1,6 +1,8 @@
 import { readItems, createItem, updateItem, deleteItem } from '@directus/sdk'
 import type { Task } from '~/types/directus'
 import { toast } from 'vue-sonner'
+import { offlineKvGet, offlineKvSet } from '~/utils/offlineDb'
+import { buildOfflineKey, getOfflineUserId } from '~/utils/offlineKeys'
 
 export const useTripTasksNew = () => {
   const { getClient, directusUserId } = useDirectusRepo()
@@ -11,6 +13,12 @@ export const useTripTasksNew = () => {
   const fetchTasks = async (tripId: number) => {
     loading.value = true
     try {
+      const userId = getOfflineUserId()
+      if (userId && Number.isFinite(tripId) && tripId > 0) {
+        const cached = await offlineKvGet<Task[]>(buildOfflineKey(userId, ['trip', tripId, 'tasks']))
+        if (Array.isArray(cached)) tasks.value = cached
+      }
+
       const client = await getClient()
       const result = await client.request(readItems('tasks', {
         filter: { trip_id: { _eq: tripId } },
@@ -20,6 +28,9 @@ export const useTripTasksNew = () => {
       }))
 
       tasks.value = Array.isArray(result) ? result as Task[] : []
+      if (userId && Number.isFinite(tripId) && tripId > 0) {
+        await offlineKvSet(buildOfflineKey(userId, ['trip', tripId, 'tasks']), tasks.value)
+      }
     } catch (e) {
       console.error('Error fetching tasks (new):', e)
     } finally {

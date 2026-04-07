@@ -28,6 +28,7 @@ export interface Expense {
   paidByTripUserId?: number | null
   userCreatedId?: string
   status: 'real' | 'planned' // Added status field
+  syncStatus?: 'synced' | 'pending' | 'error'
   photo?: string // Optional base64 or URL
 }
 

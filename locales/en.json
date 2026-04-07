@@ -891,6 +891,11 @@
       "directions_prefix": "Directions to",
       "open_maps": "Open Google Maps link"
     },
+    "offline": {
+      "offline_badge": "Offline",
+      "pending_prefix": "Pending",
+      "pending_suffix": "to sync"
+    },
     "tabs": {
       "expenses": "Expenses",
       "itinerary": "Itinerary"

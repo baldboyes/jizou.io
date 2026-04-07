@@ -103,6 +103,7 @@ export interface Expense {
   date_created: string
   trip_id: number | Trip
   paid_by_trip_user_id?: number | TripsUser | null
+  client_generated_id?: string
   date: string
   concept: string
   amount: number

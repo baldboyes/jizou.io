@@ -8,6 +8,8 @@ import type {
   Trip 
 } from '~/types/directus'
 import { toFloatingLocalDate, toIsoZFromFloatingInput } from '~/utils/floatingDateTime'
+import { offlineKvGet, offlineKvSet } from '~/utils/offlineDb'
+import { buildOfflineKey, getOfflineUserId } from '~/utils/offlineKeys'
 
 export interface TimelineItemNew {
   id: string
@@ -142,6 +144,18 @@ export const useTripOrganizationNew = () => {
     loading.value = true
     
     try {
+      const userId = getOfflineUserId()
+      if (userId && Number.isFinite(tripId) && tripId > 0) {
+        const cached = await offlineKvGet<any>(buildOfflineKey(userId, ['trip', tripId, 'organization']))
+        if (cached && typeof cached === 'object') {
+          flights.value = Array.isArray(cached.flights) ? cached.flights : flights.value
+          accommodations.value = Array.isArray(cached.accommodations) ? cached.accommodations : accommodations.value
+          transports.value = Array.isArray(cached.transports) ? cached.transports : transports.value
+          activities.value = Array.isArray(cached.activities) ? cached.activities : activities.value
+          insurances.value = Array.isArray(cached.insurances) ? cached.insurances : insurances.value
+        }
+      }
+
       const client = await getClient()
       
       const query = (sortField: string) => ({
@@ -166,6 +180,16 @@ export const useTripOrganizationNew = () => {
       transports.value = t as Transport[]
       activities.value = act as Activity[]
       insurances.value = s as Insurance[]
+
+      if (userId && Number.isFinite(tripId) && tripId > 0) {
+        await offlineKvSet(buildOfflineKey(userId, ['trip', tripId, 'organization']), {
+          flights: flights.value,
+          accommodations: accommodations.value,
+          transports: transports.value,
+          activities: activities.value,
+          insurances: insurances.value
+        })
+      }
       
     } catch (e: any) {
       try {
@@ -175,6 +199,17 @@ export const useTripOrganizationNew = () => {
         transports.value = Array.isArray(res?.transports) ? res.transports : []
         activities.value = Array.isArray(res?.activities) ? res.activities : []
         insurances.value = Array.isArray(res?.insurances) ? res.insurances : []
+
+        const userId = getOfflineUserId()
+        if (userId && Number.isFinite(tripId) && tripId > 0) {
+          await offlineKvSet(buildOfflineKey(userId, ['trip', tripId, 'organization']), {
+            flights: flights.value,
+            accommodations: accommodations.value,
+            transports: transports.value,
+            activities: activities.value,
+            insurances: insurances.value
+          })
+        }
       } catch (fallbackError: any) {
         console.error('Error fetching organization data (new):', e)
       }

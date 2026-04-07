@@ -1,12 +1,15 @@
-import { createItem, updateItem, deleteItem } from '@directus/sdk'
+import { createItem, updateItem, deleteItem, readItems } from '@directus/sdk'
 import type { Expense as DirectusExpense } from '~/types/directus'
 import type { Expense as AppExpense, ExpenseCategory, PaymentMethod } from '~/types'
+import { offlineKvGet, offlineKvSet, offlineOutboxDelete, offlineOutboxListExpenseCreatesForTrip, offlineOutboxPut } from '~/utils/offlineDb'
+import { buildOfflineKey, createClientId, getOfflineUserId } from '~/utils/offlineKeys'
 
 export const useExpensesNew = () => {
   const { getClient } = useDirectusRepo()
   const expenses = useState<AppExpense[]>('expenses-new', () => [])
   const loading = useState<boolean>('expenses-new-loading', () => false)
   const error = useState<string | null>('expenses-new-error', () => null)
+  const pendingCreateCountByTrip = useState<Record<string, number>>('expenses-new-pending-create-count-by-trip', () => ({}))
 
   // --- Mappers ---
   const mapDirectusToApp = (e: DirectusExpense): AppExpense => ({
@@ -56,21 +59,45 @@ export const useExpensesNew = () => {
 
   // --- Actions ---
 
+  const refreshPendingCreateCount = async (tripId: number | string) => {
+    const userId = getOfflineUserId()
+    const tripIdNum = Number(tripId)
+    if (!userId || !Number.isFinite(tripIdNum) || tripIdNum <= 0) return 0
+    const list = await offlineOutboxListExpenseCreatesForTrip(userId, tripIdNum)
+    pendingCreateCountByTrip.value[String(tripIdNum)] = list.length
+    return list.length
+  }
+
+  const isNetworkError = (e: any) => {
+    const msg = String(e?.message || '')
+    return msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('offline') || msg.includes('fetch')
+  }
+
   const fetchExpenses = async (tripId: number | string) => {
     loading.value = true
     error.value = null
     try {
+      const userId = getOfflineUserId()
+      const tripIdNum = Number(tripId)
+      if (userId && Number.isFinite(tripIdNum) && tripIdNum > 0) {
+        const cached = await offlineKvGet<AppExpense[]>(buildOfflineKey(userId, ['trip', tripIdNum, 'expenses']))
+        if (Array.isArray(cached)) expenses.value = cached
+        await refreshPendingCreateCount(tripIdNum)
+      }
+
       const apiRes = await $fetch('/api/trips/expenses', {
         method: 'GET',
         query: { tripId: Number(tripId) }
-      }).catch(() => null) as any
+      }) as any
 
-      const result = Array.isArray(apiRes?.expenses) ? apiRes.expenses : []
-      
-      if (Array.isArray(result)) {
-        expenses.value = result.map(mapDirectusToApp)
-      } else {
-        expenses.value = []
+      if (Array.isArray(apiRes?.expenses)) {
+        const server = apiRes.expenses.map(mapDirectusToApp)
+        const pending = expenses.value.filter(e => e.syncStatus === 'pending' || String(e.id).startsWith('local:'))
+        const merged = [...pending, ...server]
+        expenses.value = merged
+        if (userId && Number.isFinite(tripIdNum) && tripIdNum > 0) {
+          await offlineKvSet(buildOfflineKey(userId, ['trip', tripIdNum, 'expenses']), merged)
+        }
       }
     } catch (e: any) {
       console.error('Error fetching expenses (new):', e)
@@ -84,25 +111,166 @@ export const useExpensesNew = () => {
     loading.value = true
     error.value = null
     try {
+      const userId = getOfflineUserId()
+      const tripIdNum = Number(expense.trip_id)
+      const clientGeneratedId = createClientId()
+
+      if (import.meta.client && navigator && navigator.onLine === false) {
+        const localId = `local:${clientGeneratedId}`
+        const { trip_id: _tripId, ...rest } = expense as any
+        const localExpense = {
+          ...rest,
+          id: localId,
+          syncStatus: 'pending'
+        } as any as AppExpense
+
+        expenses.value.unshift(localExpense)
+
+        if (userId && Number.isFinite(tripIdNum) && tripIdNum > 0) {
+          await offlineKvSet(buildOfflineKey(userId, ['trip', tripIdNum, 'expenses']), expenses.value)
+          await offlineOutboxPut({
+            id: createClientId(),
+            userId,
+            tripId: tripIdNum,
+            kind: 'expense.create',
+            localId,
+            clientGeneratedId,
+            payload: {
+              ...mapAppToDirectus(expense),
+              trip_id: tripIdNum,
+              status: 'published',
+              client_generated_id: clientGeneratedId
+            },
+            createdAt: Date.now(),
+            lastError: null
+          })
+          await refreshPendingCreateCount(tripIdNum)
+        }
+
+        return localExpense
+      }
+
       const client = await getClient()
       const payload = {
         ...mapAppToDirectus(expense),
         trip_id: Number(expense.trip_id),
-        status: 'published' // Default status
+        status: 'published',
+        client_generated_id: clientGeneratedId
       }
       
       const result = await client.request(createItem('expenses', payload as any))
       const newExpense = mapDirectusToApp(result as DirectusExpense)
       
       expenses.value.unshift(newExpense)
+      if (userId && Number.isFinite(tripIdNum) && tripIdNum > 0) {
+        await offlineKvSet(buildOfflineKey(userId, ['trip', tripIdNum, 'expenses']), expenses.value)
+        await refreshPendingCreateCount(tripIdNum)
+      }
       return newExpense
     } catch (e: any) {
       console.error('Error creating expense (new):', e)
+      if (isNetworkError(e)) {
+        try {
+          const userId = getOfflineUserId()
+          const tripIdNum = Number(expense.trip_id)
+          const clientGeneratedId = createClientId()
+          const localId = `local:${clientGeneratedId}`
+          const { trip_id: _tripId, ...rest } = expense as any
+          const localExpense = {
+            ...rest,
+            id: localId,
+            syncStatus: 'pending'
+          } as any as AppExpense
+
+          expenses.value.unshift(localExpense)
+
+          if (userId && Number.isFinite(tripIdNum) && tripIdNum > 0) {
+            await offlineKvSet(buildOfflineKey(userId, ['trip', tripIdNum, 'expenses']), expenses.value)
+            await offlineOutboxPut({
+              id: createClientId(),
+              userId,
+              tripId: tripIdNum,
+              kind: 'expense.create',
+              localId,
+              clientGeneratedId,
+              payload: {
+                ...mapAppToDirectus(expense),
+                trip_id: tripIdNum,
+                status: 'published',
+                client_generated_id: clientGeneratedId
+              },
+              createdAt: Date.now(),
+              lastError: null
+            })
+            await refreshPendingCreateCount(tripIdNum)
+          }
+
+          return localExpense
+        } catch (fallbackError) {
+          throw e
+        }
+      }
+
       error.value = e.message || 'Error al crear el gasto'
       throw e
     } finally {
       loading.value = false
     }
+  }
+
+  const syncPendingExpenseCreates = async (tripId: number | string) => {
+    const userId = getOfflineUserId()
+    const tripIdNum = Number(tripId)
+    if (!userId || !Number.isFinite(tripIdNum) || tripIdNum <= 0) return 0
+
+    const items = await offlineOutboxListExpenseCreatesForTrip(userId, tripIdNum)
+    if (!items.length) {
+      pendingCreateCountByTrip.value[String(tripIdNum)] = 0
+      return 0
+    }
+
+    const client = await getClient()
+    let synced = 0
+
+    for (const item of items) {
+      try {
+        const created = await client.request(createItem('expenses', item.payload as any))
+        const app = mapDirectusToApp(created as DirectusExpense)
+        const index = expenses.value.findIndex(e => e.id === item.localId)
+        if (index !== -1) expenses.value[index] = app
+        await offlineOutboxDelete(item.id)
+        synced += 1
+      } catch (e: any) {
+        const msg = String(e?.message || '')
+        const isUnique = msg.includes('unique') || msg.includes('duplicate') || msg.includes('already exists')
+        if (isUnique) {
+          const existing = await client.request(readItems('expenses', {
+            filter: { client_generated_id: { _eq: item.clientGeneratedId } },
+            limit: 1,
+            fields: ['*', 'user_created']
+          } as any)).catch(() => []) as any[]
+
+          const found = Array.isArray(existing) ? existing[0] : null
+          if (found) {
+            const app = mapDirectusToApp(found as DirectusExpense)
+            const index = expenses.value.findIndex(e => e.id === item.localId)
+            if (index !== -1) expenses.value[index] = app
+            await offlineOutboxDelete(item.id)
+            synced += 1
+            continue
+          }
+        }
+
+        if (isNetworkError(e)) break
+
+        await offlineOutboxPut({ ...item, lastError: String(e?.message || e) })
+        break
+      }
+    }
+
+    await refreshPendingCreateCount(tripIdNum)
+    await offlineKvSet(buildOfflineKey(userId, ['trip', tripIdNum, 'expenses']), expenses.value)
+    return synced
   }
 
   const updateExpense = async (id: string | number, updates: Partial<AppExpense>) => {
@@ -151,6 +319,8 @@ export const useExpensesNew = () => {
     error,
     fetchExpenses,
     createExpense,
+    syncPendingExpenseCreates,
+    pendingCreateCountByTrip,
     updateExpense,
     deleteExpense
   }
