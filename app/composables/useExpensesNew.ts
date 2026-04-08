@@ -5,7 +5,7 @@ import { offlineKvGet, offlineKvSet, offlineOutboxDelete, offlineOutboxListExpen
 import { buildOfflineKey, createClientId, getOfflineUserId } from '~/utils/offlineKeys'
 
 export const useExpensesNew = () => {
-  const { getClient } = useDirectusRepo()
+  const { getClient, resetAuth } = useDirectusRepo()
   const expenses = useState<AppExpense[]>('expenses-new', () => [])
   const loading = useState<boolean>('expenses-new-loading', () => false)
   const error = useState<string | null>('expenses-new-error', () => null)
@@ -158,7 +158,19 @@ export const useExpensesNew = () => {
         client_generated_id: clientGeneratedId
       }
       
-      const result = await client.request(createItem('expenses', payload as any))
+      let result: any
+      try {
+        result = await client.request(createItem('expenses', payload as any))
+      } catch (e: any) {
+        const code = e?.errors?.[0]?.extensions?.code
+        if (code === 'INVALID_CREDENTIALS') {
+          resetAuth()
+          const fresh = await getClient()
+          result = await fresh.request(createItem('expenses', payload as any))
+        } else {
+          throw e
+        }
+      }
       const newExpense = mapDirectusToApp(result as DirectusExpense)
       
       expenses.value.unshift(newExpense)

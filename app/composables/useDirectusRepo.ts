@@ -15,6 +15,12 @@ export const useDirectusRepo = () => {
   // Cliente base sin autenticación
   const client = createDirectus<Schema>(directusUrl).with(rest())
 
+  const resetAuth = () => {
+    directusToken.value = null
+    directusUserId.value = null
+    syncPromise = null
+  }
+
   const getClient = async () => {
     // Si ya tenemos token, devolvemos cliente autenticado
     if (directusToken.value) {
@@ -72,7 +78,7 @@ export const useDirectusRepo = () => {
           }
         } catch (e) {
           console.error('[DirectusRepo] Error syncing user:', e)
-          directusToken.value = null // Limpiar token inválido
+          resetAuth()
           throw e
         } finally {
           syncPromise = null
@@ -97,6 +103,7 @@ export const useDirectusRepo = () => {
 
   return {
     getClient,
+    resetAuth,
     directusUserId,
     token: directusToken,
     url: directusUrl

@@ -36,7 +36,18 @@ export const useItineraryNew = () => {
   // Initialize selected date from trip start
   const initSelectedDate = () => {
     if (currentTrip.value?.start_date) {
-      selectedDate.value = toFloatingLocalDate(currentTrip.value.start_date) || new Date()
+      const start = toFloatingLocalDate(currentTrip.value.start_date) || new Date()
+      const end = currentTrip.value.end_date
+        ? (toFloatingLocalDate(currentTrip.value.end_date) || addDays(start, 14))
+        : addDays(start, 14)
+
+      const today = startOfDay(new Date())
+      try {
+        const within = isWithinInterval(today, { start: startOfDay(start), end: startOfDay(end) })
+        selectedDate.value = within ? today : start
+      } catch {
+        selectedDate.value = start
+      }
     }
   }
 

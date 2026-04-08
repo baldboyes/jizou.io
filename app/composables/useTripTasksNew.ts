@@ -5,7 +5,7 @@ import { offlineKvGet, offlineKvSet } from '~/utils/offlineDb'
 import { buildOfflineKey, getOfflineUserId } from '~/utils/offlineKeys'
 
 export const useTripTasksNew = () => {
-  const { getClient, directusUserId } = useDirectusRepo()
+  const { getClient, directusUserId, resetAuth } = useDirectusRepo()
   
   const tasks = useState<Task[]>('trip-tasks-new', () => [])
   const loading = useState<boolean>('trip-tasks-new-loading', () => false)
@@ -41,13 +41,25 @@ export const useTripTasksNew = () => {
   const createTask = async (task: Partial<Task>) => {
     try {
       const client = await getClient()
-      const result = await client.request(createItem('tasks', {
+      const payload = {
         ...task,
         status: task.status || 'pending',
-        // user_created is handled by Directus automatically usually, 
-        // but if we want to assign it explicitly we can if we have the field in types
         assigned_to: task.assigned_to || directusUserId.value
-      } as any))
+      } as any
+
+      let result: any
+      try {
+        result = await client.request(createItem('tasks', payload))
+      } catch (e: any) {
+        const code = e?.errors?.[0]?.extensions?.code
+        if (code === 'INVALID_CREDENTIALS') {
+          resetAuth()
+          const fresh = await getClient()
+          result = await fresh.request(createItem('tasks', payload))
+        } else {
+          throw e
+        }
+      }
       
       tasks.value.push(result as Task)
       toast.success('Tarea creada')

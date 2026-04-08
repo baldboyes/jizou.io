@@ -23,7 +23,7 @@ export interface TimelineItemNew {
 }
 
 export const useTripOrganizationNew = () => {
-  const { getClient } = useDirectusRepo()
+  const { getClient, resetAuth } = useDirectusRepo()
   
   // State
   const flights = useState<Flight[]>('org-new-flights', () => [])
@@ -275,6 +275,14 @@ export const useTripOrganizationNew = () => {
       state.value.push(res)
       return res
     } catch (e) {
+      const code = (e as any)?.errors?.[0]?.extensions?.code
+      if (code === 'INVALID_CREDENTIALS') {
+        resetAuth()
+        const client = await getClient()
+        const res = await client.request(createItem(collection as any, normalizeItemDateTimes(collection, item))) as any
+        state.value.push(res)
+        return res
+      }
       console.error(`Error creating ${collection}:`, e)
       throw e
     }
@@ -289,6 +297,15 @@ export const useTripOrganizationNew = () => {
       if (index !== -1) state.value[index] = { ...(state.value[index] || {}), ...(res || {}) }
       return res
     } catch (e) {
+      const code = (e as any)?.errors?.[0]?.extensions?.code
+      if (code === 'INVALID_CREDENTIALS') {
+        resetAuth()
+        const client = await getClient()
+        const res = await client.request(updateItem(collection as any, id, normalizeItemDateTimes(collection, item))) as any
+        const index = state.value.findIndex((i: any) => i.id === id)
+        if (index !== -1) state.value[index] = { ...(state.value[index] || {}), ...(res || {}) }
+        return res
+      }
       console.error(`Error updating ${collection}:`, e)
       throw e
     }
@@ -300,6 +317,14 @@ export const useTripOrganizationNew = () => {
       await client.request(deleteItem(collection as any, id))
       state.value = state.value.filter((i: any) => i.id !== id)
     } catch (e) {
+      const code = (e as any)?.errors?.[0]?.extensions?.code
+      if (code === 'INVALID_CREDENTIALS') {
+        resetAuth()
+        const client = await getClient()
+        await client.request(deleteItem(collection as any, id))
+        state.value = state.value.filter((i: any) => i.id !== id)
+        return
+      }
       console.error(`Error deleting ${collection}:`, e)
       throw e
     }
